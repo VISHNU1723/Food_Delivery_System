@@ -1,0 +1,111 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Food Delivery - WebSocket Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 30px auto; padding: 0 16px; }
+    input, button { padding: 10px; margin: 5px 0; }
+    input { width: 95%; }
+    button { cursor: pointer; }
+    pre { background: #f2f2f2; padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <h2>Food Delivery — Live WebSocket Test</h2>
+
+  <label>Access token</label>
+  <input id="token" type="password" placeholder="Paste your access token">
+
+  <label>Order ID (for tracking)</label>
+  <input id="orderId" type="number" placeholder="Enter order ID">
+
+  <button onclick="connect('partner')">Connect Partner</button>
+  <button onclick="connect('restaurant')">Connect Restaurant</button>
+  <button onclick="connect('order')">Track Order</button>
+  <button onclick="sendLocation()">Send Test Location</button>
+  <button onclick="disconnectAll()">Disconnect</button>
+
+  <h3>Connection status</h3>
+  <pre id="status">Not connected</pre>
+
+  <h3>Messages</h3>
+  <pre id="messages">Waiting for messages...</pre>
+
+  <script>
+    const sockets = {};
+
+    function log(message) {
+      document.getElementById("messages").textContent =
+        new Date().toLocaleTimeString() + " " + message + "\n" +
+        document.getElementById("messages").textContent;
+    }
+
+    function connect(type) {
+      const token = document.getElementById("token").value.trim();
+      const orderId = document.getElementById("orderId").value.trim();
+
+      if (!token) {
+        alert("Paste your access token first.");
+        return;
+      }
+
+      let path;
+      if (type === "partner") {
+        path = "/ws/partner";
+      } else if (type === "restaurant") {
+        path = "/ws/restaurant";
+      } else {
+        if (!orderId) {
+          alert("Enter an order ID.");
+          return;
+        }
+        path = "/ws/orders/" + encodeURIComponent(orderId);
+      }
+
+      if (sockets[type]) sockets[type].close();
+
+      const ws = new WebSocket(
+        "ws://" + location.host + path + "?token=" + encodeURIComponent(token)
+      );
+
+      sockets[type] = ws;
+
+      ws.onopen = () => {
+        document.getElementById("status").textContent =
+          type + ": Connected";
+        log(type + ": connected");
+      };
+
+      ws.onmessage = (event) => log(type + ": " + event.data);
+
+      ws.onerror = () => log(type + ": WebSocket error");
+
+      ws.onclose = (event) => {
+        log(type + ": disconnected (code " + event.code + ")");
+        document.getElementById("status").textContent =
+          type + ": Disconnected";
+      };
+    }
+
+    function sendLocation() {
+      const ws = sockets.partner;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        alert("Connect as a delivery partner first.");
+        return;
+      }
+
+      ws.send(JSON.stringify({
+        latitude: 13.0827,
+        longitude: 80.2707
+      }));
+    }
+
+    function disconnectAll() {
+      Object.values(sockets).forEach(ws => ws.close());
+    }
+  </script>
+</body>
+</html>
